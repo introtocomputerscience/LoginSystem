@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+ <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <edmx:Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <!-- Diagram content (shape and connector positions) -->
+    <edmx:Diagrams>
+      <Diagram DiagramId="1f7004e52e11458aba0855078b4888c9" Name="Diagram1">
+        <EntityTypeShape EntityType="LoginSystemModel.PasswordReset" Width="1.5" PointX="3" PointY="0.875" />
+        <EntityTypeShape EntityType="LoginSystemModel.User" Width="1.5" PointX="0.75" PointY="0.875" />
+        <AssociationConnector Association="LoginSystemModel.FK_PasswordReset_ToUser" />
+      </Diagram>
+    </edmx:Diagrams>
+  </edmx:Designer>
+</edmx:Edmx>
