@@ -15,67 +15,279 @@ namespace CustomLoginSystem.Services
     {
         private IUnitOfWork unitOfWork;
         private string secretKey;
-        public UserManagementService(IUnitOfWork unitOfWork, string secretKey)
+        private string hostname;
+        private IMailService mailHelper;
+        public UserManagementService(IUnitOfWork unitOfWork, string secretKey, string hostname, IMailService mailHelper)
         {
             this.unitOfWork = unitOfWork;
             this.secretKey = secretKey;
+            this.hostname = hostname;
+            this.mailHelper = mailHelper;
         }
         public OperationResponse CreateUser(string email, string password)
         {
             OperationResponse response;
-            var users = unitOfWork.GetRepository<User>();
-            User existingUser = users.Get(x => x.Email.Equals(email, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-            if (existingUser != null)
+            if (string.IsNullOrWhiteSpace(password))
             {
                 response = new OperationResponse()
                 {
                     IsSuccess = false,
-                    Message = Resources.Messages.CreateUserError
+                    Message = Resources.Messages.EmptyPasswordError
                 };
             }
             else
             {
-                var salt = Guid.NewGuid();
-                var saltedPassword = HashHelper.ComputeHash(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(salt.ToString()));
-                var encryptedPassword = HashHelper.ComputeHash(saltedPassword, Encoding.UTF8.GetBytes(secretKey));
-                users.Insert(new User()
+                response = UserOperation(email,
+                (repo, user) =>
                 {
-                    Email = email,
-                    Password = encryptedPassword,
-                    Salt = salt
+                    return new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.CreateUserError
+                    };
+                },
+                (repo) =>
+                {
+                    var (salt, encryptedPassword) = GetEncryptedPassword(password);
+                    repo.Insert(new User()
+                    {
+                        Email = email,
+                        Password = encryptedPassword,
+                        Salt = salt
+                    });
+                    unitOfWork.Save();
+                    return new OperationResponse()
+                    {
+                        IsSuccess = true,
+                        Message = Resources.Messages.CreateUserSuccess
+                    };
                 });
-                response = new OperationResponse()
-                {
-                    IsSuccess = true,
-                    Message = Resources.Messages.CreateUserSuccess
-                };
             }
             return response;
         }
 
         public OperationResponse RemoveUser(string email)
         {
-            return new OperationResponse();
+            return UserOperation(email,
+                (repo, user) =>
+                {
+                    repo.Delete(user);
+                    unitOfWork.Save();
+                    return new OperationResponse()
+                    {
+                        IsSuccess = true,
+                        Message = Resources.Messages.RemoveUserSuccess
+                    };
+                },
+                (repo) =>
+                {
+                    return new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.UserNotFoundError
+                    };
+                });
         }
 
         public OperationResponse UpdateUser(string email, string password)
         {
-            return new OperationResponse();
+            OperationResponse response;
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                response = new OperationResponse()
+                {
+                    IsSuccess = false,
+                    Message = Resources.Messages.EmptyPasswordError
+                };
+            }
+            else
+            {
+                response = UserOperation(email,
+                (repo, user) =>
+                {
+                    var (salt, encryptedPassword) = GetEncryptedPassword(password);
+                    user.Password = encryptedPassword;
+                    user.Salt = salt;
+                    repo.Update(user);
+                    unitOfWork.Save();
+                    return new OperationResponse()
+                    {
+                        IsSuccess = true,
+                        Message = Resources.Messages.UpdateUserSuccess
+                    };
+                },
+                (repo) =>
+                {
+                    return new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.UserNotFoundError
+                    };
+                });
+            }
+            return response;
         }
 
         public OperationResponse Login(string email, string password)
         {
-            return new OperationResponse();
+            OperationResponse response;
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                response = new OperationResponse()
+                {
+                    IsSuccess = false,
+                    Message = Resources.Messages.EmptyPasswordError
+                };
+            }
+            else
+            {
+                response = UserOperation(email,
+                (repo, user) =>
+                {
+                    var submittedPassword = GetEncryptedPassword(user.Salt, password);
+                    var equal = user.Password.SequenceEqual(submittedPassword);
+                    if (equal)
+                    {
+                        return new OperationResponse()
+                        {
+                            IsSuccess = true,
+                            Message = Resources.Messages.LoginSuccess
+                        };
+                    }
+                    else
+                    {
+                        return new OperationResponse()
+                        {
+                            IsSuccess = false,
+                            Message = Resources.Messages.LoginFailure
+                        };
+                    }
+                },
+                (repo) =>
+                {
+                    return new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.UserNotFoundError
+                    };
+                });
+            }
+            return response;
         }
 
         public OperationResponse InitiateForgotPassword(string email)
         {
-            return new OperationResponse();
+            return UserOperation(email,
+                (repo, user) =>
+                {
+                    var passwordResetRepo = unitOfWork.GetRepository<PasswordReset>();
+                    var resetKey = Guid.NewGuid();
+                    passwordResetRepo.Insert(new PasswordReset()
+                    {
+                        DateRequested = DateTime.UtcNow,
+                        User = user,
+                        Key = resetKey
+                    });
+                    unitOfWork.Save();
+                    var passwordResetLink = $"{hostname}/User/ResetPassword/{resetKey}";
+                    mailHelper.SendMail(user.Email, "Example.com - Password Reset Request", $@"<html><body>Hello,<br/><br/>A password reset has been initiated for your account. Please click <a href=""{passwordResetLink}"">here</a> to reset your password.<br/>Thanks,<br/>Admin Team</body></html>");
+                    return new OperationResponse()
+                    {
+                        IsSuccess = true,
+                        Message = Resources.Messages.InitiateForgotPasswordSuccess
+                    };
+                },
+                (repo) =>
+                {
+                    return new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.UserNotFoundError
+                    };
+                });
         }
 
         public OperationResponse ForgotPasswordReset(Guid key, string password)
         {
-            return new OperationResponse();
+            OperationResponse response;
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                response = new OperationResponse()
+                {
+                    IsSuccess = false,
+                    Message = Resources.Messages.EmptyPasswordError
+                };
+            }
+            else
+            {
+                var passwordResetRepo = unitOfWork.GetRepository<PasswordReset>();
+                var passwordReset = passwordResetRepo.Get(x => x.Key == key).FirstOrDefault();
+                if (passwordReset != null)
+                {
+                    if (DateTime.UtcNow.AddMinutes(-15) > passwordReset.DateRequested)
+                    {
+                        response = new OperationResponse()
+                        {
+                            IsSuccess = false,
+                            Message = Resources.Messages.ForgotPasswordResetExpired
+                        };
+                    }
+                    else
+                    {
+                        response = UpdateUser(passwordReset.User.Email, password);
+                    }
+                }
+                else
+                {
+                    response = new OperationResponse()
+                    {
+                        IsSuccess = false,
+                        Message = Resources.Messages.KeyNotFoundError
+                    };
+                }
+            }
+            return response;
+        }
+
+        private OperationResponse UserOperation(string email, Func<IRepository<User>, User, OperationResponse> userFunc, Func<IRepository<User>, OperationResponse> noUserFunc)
+        {
+            OperationResponse response;
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                response = new OperationResponse()
+                {
+                    IsSuccess = false,
+                    Message = Resources.Messages.EmptyEmailError
+                };
+            }
+            else
+            {
+                var users = unitOfWork.GetRepository<User>();
+                User existingUser = users.Get(x => x.Email.Equals(email, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+                if (existingUser != null)
+                {
+                    response = userFunc(users, existingUser);
+                }
+                else
+                {
+                    response = noUserFunc(users);
+                }
+            }
+            return response;
+        }
+
+        private (Guid salt, byte[] encryptedPassword) GetEncryptedPassword(string password)
+        {
+            var salt = Guid.NewGuid();
+            var encryptedPassword = GetEncryptedPassword(salt, password);
+            return (salt, encryptedPassword);
+        }
+
+        private byte[] GetEncryptedPassword(Guid salt, string password)
+        {
+            var saltedPassword = HashHelper.ComputeHash(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(salt.ToString()));
+            var encryptedPassword = HashHelper.ComputeHash(saltedPassword, Encoding.UTF8.GetBytes(secretKey));
+            return encryptedPassword;
         }
     }
 }

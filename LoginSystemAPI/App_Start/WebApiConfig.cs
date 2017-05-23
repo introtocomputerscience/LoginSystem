@@ -20,10 +20,17 @@ namespace CustomLoginSystem
         {
             // Load AppSettings
             var secretKey = ConfigurationManager.AppSettings["SecretKey"];
+            var hostname = ConfigurationManager.AppSettings["HostName"];
+            var smtpEmail = ConfigurationManager.AppSettings["SmtpEmail"];
+            var smtpHost = ConfigurationManager.AppSettings["SmtpHost"];
+            var smtpPort = int.Parse(ConfigurationManager.AppSettings["SmtpPort"]);
+            var smtpUsername = ConfigurationManager.AppSettings["SmtpUsername"];
+            var smtpPassword = ConfigurationManager.AppSettings["SmtpPassword"];
             // Autofac
             var builder = new ContainerBuilder();
             builder.RegisterType<UnitOfWork<LoginSystemEntities>>().As<IUnitOfWork>();
-            builder.Register<UserManagementService>(c => new UserManagementService(c.Resolve<IUnitOfWork>(), secretKey)).As<IUserManagementService>();
+            builder.Register<SmtpMailService>(c => new SmtpMailService(smtpEmail, smtpHost, smtpPort, smtpUsername, smtpPassword)).As<IMailService>();
+            builder.Register<UserManagementService>(c => new UserManagementService(c.Resolve<IUnitOfWork>(), secretKey, hostname, c.Resolve<IMailService>())).As<IUserManagementService>();
             builder.RegisterApiControllers(Assembly.GetExecutingAssembly());
             config.DependencyResolver = new AutofacWebApiDependencyResolver(builder.Build());
 
