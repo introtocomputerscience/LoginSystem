@@ -19,5 +19,6 @@ namespace CustomLoginSystem.Resources
         public const string ForgotPasswordResetExpired = "Password reset has expired.";
         public const string UserNotFoundError = "A user was not found with the requested email.";
         public const string KeyNotFoundError = "A password reset was not found with the requested key.";
+        public const string Unauthorized = "Unauthorized.";
     }
 }

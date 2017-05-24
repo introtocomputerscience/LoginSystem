@@ -178,66 +178,6 @@ namespace CustomLoginSystem.Services.Tests
         }
 
         [TestMethod()]
-        public void LoginWithValidDetailsTest()
-        {
-            var email = "test@test.com";
-            var password = "samplePassword";
-
-            var salt = Guid.NewGuid();
-            var saltedPassword = HashHelper.ComputeHash(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(salt.ToString()));
-            var encryptedPassword = HashHelper.ComputeHash(saltedPassword, Encoding.UTF8.GetBytes(secretKey));
-
-            var user = new User()
-            {
-                Email = email,
-                Password = encryptedPassword,
-                Salt = salt
-            };
-            userRepository.Setup(x => x.Get(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<Func<IQueryable<User>, IOrderedQueryable<User>>>(), It.IsAny<string>())).Returns(new List<User> { user });
-
-            var response = service.Login(email, password);
-
-            Assert.IsTrue(response.IsSuccess);
-            Assert.AreEqual(Resources.Messages.LoginSuccess, response.Message);
-        }
-
-        [TestMethod()]
-        public void LoginWithInvalidDetailsTest()
-        {
-            var email = "test@test.com";
-            var password = "samplePassword";
-
-            var salt = Guid.NewGuid();
-            var saltedPassword = HashHelper.ComputeHash(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(salt.ToString()));
-            var encryptedPassword = HashHelper.ComputeHash(saltedPassword, Encoding.UTF8.GetBytes(secretKey));
-
-            var user = new User()
-            {
-                Email = email,
-                Password = encryptedPassword,
-                Salt = salt
-            };
-            userRepository.Setup(x => x.Get(It.IsAny<Expression<Func<User, bool>>>(), It.IsAny<Func<IQueryable<User>, IOrderedQueryable<User>>>(), It.IsAny<string>())).Returns(new List<User> { user });
-
-            var response = service.Login(email, "invalidPassword");
-
-            Assert.IsFalse(response.IsSuccess);
-            Assert.AreEqual(Resources.Messages.LoginFailure, response.Message);
-        }
-
-        [TestMethod()]
-        public void LoginWithNonExistingEmailTest()
-        {
-            var email = "test@test.com";
-            var password = "samplePassword";
-
-            var response = service.Login(email, password);
-
-            Assert.IsFalse(response.IsSuccess);
-            Assert.AreEqual(Resources.Messages.UserNotFoundError, response.Message);
-        }
-
-        [TestMethod()]
         public void InitiateForgotPasswordWithExistingEmailTest()
         {
             var email = "test@test.com";

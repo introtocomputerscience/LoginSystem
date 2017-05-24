@@ -48,7 +48,7 @@ namespace CustomLoginSystem.Services
                 },
                 (repo) =>
                 {
-                    var (salt, encryptedPassword) = GetEncryptedPassword(password);
+                    var (salt, encryptedPassword) = HashHelper.GetEncryptedPassword(password, secretKey);
                     repo.Insert(new User()
                     {
                         Email = email,
@@ -105,7 +105,7 @@ namespace CustomLoginSystem.Services
                 response = UserOperation(email,
                 (repo, user) =>
                 {
-                    var (salt, encryptedPassword) = GetEncryptedPassword(password);
+                    var (salt, encryptedPassword) = HashHelper.GetEncryptedPassword(password, secretKey);
                     user.Password = encryptedPassword;
                     user.Salt = salt;
                     repo.Update(user);
@@ -115,53 +115,6 @@ namespace CustomLoginSystem.Services
                         IsSuccess = true,
                         Message = Resources.Messages.UpdateUserSuccess
                     };
-                },
-                (repo) =>
-                {
-                    return new OperationResponse()
-                    {
-                        IsSuccess = false,
-                        Message = Resources.Messages.UserNotFoundError
-                    };
-                });
-            }
-            return response;
-        }
-
-        public OperationResponse Login(string email, string password)
-        {
-            OperationResponse response;
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                response = new OperationResponse()
-                {
-                    IsSuccess = false,
-                    Message = Resources.Messages.EmptyPasswordError
-                };
-            }
-            else
-            {
-                response = UserOperation(email,
-                (repo, user) =>
-                {
-                    var submittedPassword = GetEncryptedPassword(user.Salt, password);
-                    var equal = user.Password.SequenceEqual(submittedPassword);
-                    if (equal)
-                    {
-                        return new OperationResponse()
-                        {
-                            IsSuccess = true,
-                            Message = Resources.Messages.LoginSuccess
-                        };
-                    }
-                    else
-                    {
-                        return new OperationResponse()
-                        {
-                            IsSuccess = false,
-                            Message = Resources.Messages.LoginFailure
-                        };
-                    }
                 },
                 (repo) =>
                 {
@@ -276,18 +229,6 @@ namespace CustomLoginSystem.Services
             return response;
         }
 
-        private (Guid salt, byte[] encryptedPassword) GetEncryptedPassword(string password)
-        {
-            var salt = Guid.NewGuid();
-            var encryptedPassword = GetEncryptedPassword(salt, password);
-            return (salt, encryptedPassword);
-        }
 
-        private byte[] GetEncryptedPassword(Guid salt, string password)
-        {
-            var saltedPassword = HashHelper.ComputeHash(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(salt.ToString()));
-            var encryptedPassword = HashHelper.ComputeHash(saltedPassword, Encoding.UTF8.GetBytes(secretKey));
-            return encryptedPassword;
-        }
     }
 }

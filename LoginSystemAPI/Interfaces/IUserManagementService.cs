@@ -12,7 +12,6 @@ namespace CustomLoginSystem.Interfaces
         OperationResponse CreateUser(string email, string password);
         OperationResponse RemoveUser(string email);
         OperationResponse UpdateUser(string email, string password);
-        OperationResponse Login(string email, string password);
         OperationResponse InitiateForgotPassword(string email);
         OperationResponse ForgotPasswordReset(Guid key, string password);
     }
